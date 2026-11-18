@@ -1,7 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
+
+[assembly: AssemblyTitle("Rubik Solve For Robot")]
+[assembly: AssemblyDescription("Rubik 3x3 2D Scramble Vision to 4-Pusher (R, L, F, B) USB Arduino Nano Controller")]
+[assembly: AssemblyConfiguration("")]
+[assembly: AssemblyCompany("RubikSolveForRobot")]
+[assembly: AssemblyProduct("Rubik Solve For Robot Desktop")]
+[assembly: AssemblyCopyright("Copyright (c) 2026 RubikSolveForRobot")]
+[assembly: AssemblyTrademark("")]
+[assembly: AssemblyCulture("")]
+[assembly: ComVisible(false)]
+[assembly: Guid("7a4e9d12-5c8b-4f31-9a2e-6d8c1b3e5f70")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
 
 namespace RubikRobotDesktop
 {

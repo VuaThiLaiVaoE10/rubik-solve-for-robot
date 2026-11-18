@@ -39,11 +39,9 @@ Vì mỗi thanh đẩy Servo chỉ đẩy mặt Rubik quay theo một chiều c�
 
 ## 🚀 Cách Sử Dụng Nhanh
 
-### 1. Chạy trực tiếp App Desktop (`.exe`)
-Không cần cài thêm thư viện hay bật server/trình duyệt. Bấm đúp trực tiếp vào file:
-```text
-RubikRobotDesktop.exe
-```
+### 1. Chạy trực tiếp App Desktop (`.exe` hoặc `.bat` không bao giờ bị Windows SmartScreen chặn)
+- **Khi mở trên máy**: Bấm đúp trực tiếp vào `RubikRobotDesktop.exe`.
+- **Khi tải từ GitHub về bằng trình duyệt (Brave/Chrome/Edge)**: Trình duyệt sẽ gắn nhãn `Zone.Identifier` cho mọi file `.exe` tải từ Internet. Bạn chỉ cần bấm đúp vào **`Chay_RubikRobot.bat`** (script sẽ tự động gỡ nhãn `Unblock-File`, biên dịch sạch tại chỗ bằng `csc.exe` của Windows trong 1 giây và mở thẳng ứng dụng mà không bao giờ hiện bảng xanh SmartScreen), hoặc bấm **"Chạy dù thế nào đi nữa"** trên hộp thoại SmartScreen.
 
 ### 2. Chạy kiểm thử tự động toàn luồng (Headless Self-Test)
 ```powershell
@@ -53,7 +51,7 @@ RubikRobotDesktop.exe
 ### 3. Biên dịch lại từ mã nguồn C# (nếu chỉnh sửa code)
 Sử dụng trình biên dịch C# có sẵn của Windows (`.NET Framework 4.x`):
 ```powershell
-& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /out:RubikRobotDesktop.exe /r:System.dll /r:System.Core.dll /r:System.Data.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll src\RubikCore.cs src\MainForm.cs src\Program.cs
+& "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /win32manifest:src\app.manifest /out:RubikRobotDesktop.exe /r:System.dll /r:System.Core.dll /r:System.Data.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll src\RubikCore.cs src\MainForm.cs src\Program.cs
 ```
 
 ---
