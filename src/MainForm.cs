@@ -1694,25 +1694,28 @@ namespace RubikRobotDesktop
 
             int plotW = Math.Max(40, ClientSize.Width - leftMargin - rightMargin);
             int plotH = Math.Max(40, ClientSize.Height - topMargin - bottomMargin);
-            int trackH = plotH / 4;
+            int trackCount = 6;
+            int trackH = Math.Max(14, plotH / trackCount);
 
-            char[] trackFaces = new char[] { 'R', 'L', 'F', 'B' };
-            string[] trackLabels = new string[] { "D5 (R)", "D6 (L)", "D9 (F)", "D10 (B)" };
+            char[] trackFaces = new char[] { 'R', 'L', 'F', 'B', 'U', 'D' };
+            string[] trackLabels = new string[] { "D5 (R)", "D6 (L)", "D9 (F)", "D10 (B)", "D11 (U)", "D12 (D)" };
             Color[] trackColors = new Color[]
             {
                 Color.FromArgb(239, 68, 68),
                 Color.FromArgb(249, 115, 22),
                 Color.FromArgb(34, 197, 94),
-                Color.FromArgb(59, 130, 246)
+                Color.FromArgb(59, 130, 246),
+                Color.FromArgb(241, 245, 249),
+                Color.FromArgb(234, 179, 8)
             };
 
             using (Pen gridPen = new Pen(Color.FromArgb(30, 41, 59), 1F))
             using (Pen basePen = new Pen(Color.FromArgb(51, 65, 85), 1F))
-            using (Font labelFont = new Font("Consolas", 8.5F, FontStyle.Bold))
+            using (Font labelFont = new Font("Consolas", 8.0F, FontStyle.Bold))
             using (Font axisFont = new Font("Consolas", 7.5F, FontStyle.Regular))
             using (SolidBrush mutedBrush = new SolidBrush(Color.FromArgb(148, 163, 184)))
             {
-                for (int t = 0; t < 4; t++)
+                for (int t = 0; t < trackCount; t++)
                 {
                     int yTop = topMargin + t * trackH + 4;
                     int yBase = topMargin + (t + 1) * trackH - 8;

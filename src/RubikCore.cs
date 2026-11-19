@@ -17,6 +17,10 @@ namespace RubikRobotDesktop
         public const string PIN_SERVO_L = "D6";
         public const string PIN_SERVO_F = "D9";
         public const string PIN_SERVO_B = "D10";
+        public const string PIN_SERVO_U = "D11";
+        public const string PIN_SERVO_D = "D12";
+        public const string PIN_CLAMP_UD = "D7"; // Trục 1 (A1): Kẹp Trắng U - Vàng D -> xoay R, L, F, B
+        public const string PIN_CLAMP_RL = "D8"; // Trục 2 (A2): Kẹp Đỏ R - Cam L -> xoay U, D, F, B
         public const string PIN_BTN_START = "D2";
         public const string PIN_BTN_STOP = "D3";
 
@@ -24,23 +28,29 @@ namespace RubikRobotDesktop
         public const int SERVO_INDEX_L = 1;
         public const int SERVO_INDEX_F = 2;
         public const int SERVO_INDEX_B = 3;
+        public const int SERVO_INDEX_U = 4;
+        public const int SERVO_INDEX_D = 5;
 
         public const int SERVO_PUSH_ANGLE = 75;
         public const int SERVO_REST_ANGLE = 0;
         public const int HOLD_TIME_MS = 150;
         public const int RETURN_TIME_MS = 150;
         public const int PUSH_CYCLE_MS = 300;
+        public const int AXIS_SWITCH_MS = 200;
 
         public const int SERIAL_BAUD_RATE = 9600;
-        public const string TEST_SEQUENCE = "R L2 F3 B";
+        public const string TEST_SEQUENCE = "A1 R L2 F3 B A2 U D2";
         public const string EMERGENCY_STOP_CMD = "!";
 
         public static readonly string[] SUPPORTED_TOKENS = new string[]
         {
+            "A1", "A2",
             "R", "R2", "R3",
             "L", "L2", "L3",
             "F", "F2", "F3",
-            "B", "B2", "B3"
+            "B", "B2", "B3",
+            "U", "U2", "U3",
+            "D", "D2", "D3"
         };
 
         public static string GetPinForFace(char face)
@@ -51,6 +61,8 @@ namespace RubikRobotDesktop
                 case 'L': return PIN_SERVO_L;
                 case 'F': return PIN_SERVO_F;
                 case 'B': return PIN_SERVO_B;
+                case 'U': return PIN_SERVO_U;
+                case 'D': return PIN_SERVO_D;
                 default: return string.Empty;
             }
         }
@@ -1664,9 +1676,12 @@ namespace RubikRobotDesktop
     /// </summary>
     public static class RLBFCompiler4Pusher
     {
-        // Slot indices: 0=U, 1=R, 2=F, 3=D, 4=L, 5=B
-        private static readonly char[] SLOT_CHARS = new char[] { 'U', 'R', 'F', 'D', 'L', 'B' };
-
+        /// <summary>
+        /// Biên dịch lời giải 6 mặt sang giao thức Cơ Cấu 2 Trục Kẹp Luân Phiên (KHÔNG LẬT KHỐI):
+        /// - Trục 1 (A1 - Kẹp Trắng U & Vàng D): mở khóa xoay R, L, F, B
+        /// - Trục 2 (A2 - Kẹp Đỏ R & Cam L): mở khóa xoay U, D, F, B
+        /// - Tối ưu hình học: F và B vuông góc với cả 2 trục nên giữ nguyên trục hiện tại (0 chuyển trục thừa).
+        /// </summary>
         public static CompiledRLBFResult CompileTo4Pusher(List<string> standardMoves, string initialState54)
         {
             CompiledRLBFResult result = new CompiledRLBFResult();
@@ -1676,10 +1691,9 @@ namespace RubikRobotDesktop
                 result.OriginalMovesText = string.Join(" ", standardMoves.ToArray());
             }
 
-            // faceMap[slot] = which logical face ('U','R','F','D','L','B') currently sits in physical slot
-            char[] faceMap = new char[] { 'U', 'R', 'F', 'D', 'L', 'B' };
-
             string simState = initialState54;
+            string currentAxis = "A1"; // Mặc định ban đầu: Kẹp Trắng U - Vàng D (mở khóa R, L, F, B)
+            bool axisEmitted = false;
             int currentMs = 0;
             int stepIndex = 1;
 
@@ -1690,41 +1704,52 @@ namespace RubikRobotDesktop
                     string origMove = standardMoves[i] == null ? string.Empty : standardMoves[i].Trim();
                     if (origMove.Length == 0) continue;
 
-                    char logicalFace = char.ToUpper(origMove[0]);
-                    int pushCount = 1;
-                    if (origMove.EndsWith("2")) pushCount = 2;
-                    else if (origMove.EndsWith("'")) pushCount = 3;
-
-                    int slot = FindSlot(faceMap, logicalFace);
-                    string preRot = string.Empty;
-
-                    // If target face is currently on physical U(0) or D(3), re-orient via whole-cube x'
-                    // so U -> F(2) and D -> B(5) while R(1) and L(4) stay fixed.
-                    if (slot == 0 || slot == 3)
+                    char face = char.ToUpper(origMove[0]);
+                    if (face != 'R' && face != 'L' && face != 'F' && face != 'B' && face != 'U' && face != 'D')
                     {
-                        preRot = "x'";
-                        ApplyWholeCubeXPrime(faceMap);
-                        if (!string.IsNullOrEmpty(simState) && simState.Length == 54)
-                        {
-                            simState = RubikSolver3x3.ApplyMove(simState, preRot);
-                        }
-                        slot = FindSlot(faceMap, logicalFace);
+                        continue;
                     }
 
-                    char physicalFace = SLOT_CHARS[slot];
+                    int pushCount = 1;
+                    if (origMove.EndsWith("2")) pushCount = 2;
+                    else if (origMove.EndsWith("'") || origMove.EndsWith("3")) pushCount = 3;
+
+                    string axisSwitchNote = string.Empty;
+                    string neededAxis = currentAxis;
+                    if (face == 'R' || face == 'L')
+                    {
+                        neededAxis = "A1";
+                    }
+                    else if (face == 'U' || face == 'D')
+                    {
+                        neededAxis = "A2";
+                    }
+                    // F và B tự do ở cả A1 lẫn A2 -> giữ nguyên currentAxis!
+
+                    if (!axisEmitted || !string.Equals(neededAxis, currentAxis, StringComparison.Ordinal))
+                    {
+                        currentAxis = neededAxis;
+                        axisEmitted = true;
+                        result.PusherTokens.Add(currentAxis);
+                        axisSwitchNote = string.Equals(currentAxis, "A1", StringComparison.Ordinal)
+                            ? "A1: Kẹp Trắng U-Vàng D"
+                            : "A2: Kẹp Đỏ R-Cam L";
+                        currentMs += RobotHardware.AXIS_SWITCH_MS;
+                    }
+
                     string token = pushCount == 1
-                        ? physicalFace.ToString()
-                        : string.Format("{0}{1}", physicalFace, pushCount);
+                        ? face.ToString()
+                        : string.Format("{0}{1}", face, pushCount);
 
                     int durationMs = pushCount * RobotHardware.PUSH_CYCLE_MS;
                     PusherStep step = new PusherStep
                     {
                         StepIndex = stepIndex++,
                         OriginalMove = origMove,
-                        PreRotation = preRot,
-                        Face = physicalFace,
+                        PreRotation = axisSwitchNote,
+                        Face = face,
                         Token = token,
-                        PinName = RobotHardware.GetPinForFace(physicalFace),
+                        PinName = RobotHardware.GetPinForFace(face),
                         PushCount = pushCount,
                         DurationMs = durationMs,
                         StartMs = currentMs,
@@ -1738,7 +1763,7 @@ namespace RubikRobotDesktop
 
                     if (!string.IsNullOrEmpty(simState) && simState.Length == 54)
                     {
-                        string cwMove = physicalFace.ToString();
+                        string cwMove = face.ToString();
                         for (int p = 0; p < pushCount; p++)
                         {
                             simState = RubikSolver3x3.ApplyMove(simState, cwMove);
@@ -1749,29 +1774,11 @@ namespace RubikRobotDesktop
 
             result.TotalDurationMs = currentMs;
             result.SerialPayload = string.Join(" ", result.PusherTokens.ToArray());
+            // Kiểm chứng nghiêm ngặt: KHÔNG cho phép lật khối ảo (allowWholeCubeRotation = false)!
             result.VerifiedSolved = !string.IsNullOrEmpty(simState) &&
-                RubikSolver3x3.IsSolved(simState, true);
+                RubikSolver3x3.IsSolved(simState, false);
 
             return result;
-        }
-
-        private static int FindSlot(char[] faceMap, char logicalFace)
-        {
-            for (int i = 0; i < 6; i++)
-            {
-                if (faceMap[i] == logicalFace) return i;
-            }
-            throw new ArgumentException("Invalid logical face: " + logicalFace);
-        }
-
-        private static void ApplyWholeCubeXPrime(char[] faceMap)
-        {
-            // x' moves: U(0) -> F(2) -> D(3) -> B(5) -> U(0); R(1) and L(4) unchanged
-            char tmp = faceMap[5];
-            faceMap[5] = faceMap[3];
-            faceMap[3] = faceMap[2];
-            faceMap[2] = faceMap[0];
-            faceMap[0] = tmp;
         }
     }
 }

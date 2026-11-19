@@ -25,18 +25,41 @@
 
 const int PIN_BTN_START = 2; // D2
 const int PIN_BTN_STOP  = 3; // D3
-const int servoPins[4]  = {5, 6, 9, 10}; // D5=R, D6=L, D9=F, D10=B
+const int PIN_CLAMP_UD  = 7; // D7 - Trục kẹp 1 (A1): Kẹp Trắng U - Vàng D -> xoay R, L, F, B
+const int PIN_CLAMP_RL  = 8; // D8 - Trục kẹp 2 (A2): Kẹp Đỏ R - Cam L -> xoay U, D, F, B
+const int servoPins[6]  = {5, 6, 9, 10, 11, 12}; // D5=R, D6=L, D9=F, D10=B, D11=U, D12=D
 
-const int GOC_NGHI = 0;      // 0 độ (thu thanh đẩy về)
-const int GOC_DAY  = 75;     // 75 độ (0x4B trong file .hex - đẩy mặt Rubik xoay 90°)
+const int GOC_NGHI = 0;        // 0 độ (thu thanh đẩy về)
+const int GOC_DAY  = 75;       // 75 độ (0x4B trong file .hex - đẩy mặt Rubik xoay 90°)
 const int THOI_GIAN_GIU = 150; // 150ms (0x96 trong file .hex)
+const int THOI_GIAN_KEP = 100; // 100ms ổn định cơ khí khi chuyển trục kẹp
 
-Servo servos[4];
+Servo servos[6];
 volatile bool dungKhanCap = false;
 
 void duaVeViTriGoc() {
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 6; i++) {
     servos[i].write(GOC_NGHI);
+  }
+}
+
+void chuyenTrucKep(int truc) {
+  if (kiemTraDungKhanCap()) return;
+  duaVeViTriGoc();
+  if (truc == 1) {
+    // Đóng kẹp Trục 1 (Trắng U - Vàng D) TRƯỚC rồi mới nhả Trục 2 để chống rơi khối Rubik
+    digitalWrite(PIN_CLAMP_UD, HIGH);
+    delay(THOI_GIAN_KEP);
+    digitalWrite(PIN_CLAMP_RL, LOW);
+    delay(THOI_GIAN_KEP);
+    Serial.println("[TRUC A1] Kep Trang(U)-Vang(D) -> Mo khoa R, L, F, B");
+  } else if (truc == 2) {
+    // Đóng kẹp Trục 2 (Đỏ R - Cam L) TRƯỚC rồi mới nhả Trục 1
+    digitalWrite(PIN_CLAMP_RL, HIGH);
+    delay(THOI_GIAN_KEP);
+    digitalWrite(PIN_CLAMP_UD, LOW);
+    delay(THOI_GIAN_KEP);
+    Serial.println("[TRUC A2] Kep Do(R)-Cam(L) -> Mo khoa U, D, F, B");
   }
 }
 
@@ -86,6 +109,14 @@ void thucThiLenhDon(String token) {
     kiemTraDungKhanCap();
     return;
   }
+  if (token == "A1") {
+    chuyenTrucKep(1);
+    return;
+  }
+  if (token == "A2") {
+    chuyenTrucKep(2);
+    return;
+  }
 
   char mat = token.charAt(0);
   int soNhip = 1;
@@ -107,6 +138,10 @@ void thucThiLenhDon(String token) {
     dayMat(2, 'F', soNhip);
   } else if (mat == 'B') {
     dayMat(3, 'B', soNhip);
+  } else if (mat == 'U') {
+    dayMat(4, 'U', soNhip);
+  } else if (mat == 'D') {
+    dayMat(5, 'D', soNhip);
   }
 }
 
@@ -138,14 +173,20 @@ void setup() {
   Serial.begin(9600);
   pinMode(PIN_BTN_START, INPUT_PULLUP);
   pinMode(PIN_BTN_STOP, INPUT_PULLUP);
+  pinMode(PIN_CLAMP_UD, OUTPUT);
+  pinMode(PIN_CLAMP_RL, OUTPUT);
 
-  for (int i = 0; i < 4; i++) {
+  // Mặc định khởi động ở Trục 1 (A1): Kẹp Trắng U - Vàng D
+  digitalWrite(PIN_CLAMP_UD, HIGH);
+  digitalWrite(PIN_CLAMP_RL, LOW);
+
+  for (int i = 0; i < 6; i++) {
     servos[i].attach(servoPins[i]);
   }
   duaVeViTriGoc();
 
-  Serial.println("=== ROBOT GIAI RUBIK 4 THANH DAY SAN SANG ===");
-  Serial.println("Nhap lenh don (VD: R, R2, R3) hoac chuoi (VD: R L2 F3 B):");
+  Serial.println("=== ROBOT GIAI RUBIK 2 TRUC KEP LUAN PHIEN SAN SANG ===");
+  Serial.println("Nhap chuoi lenh (VD: A1 R L2 F3 B A2 U D2):");
 }
 
 void loop() {

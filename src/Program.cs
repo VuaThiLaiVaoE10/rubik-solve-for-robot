@@ -128,26 +128,59 @@ namespace RubikRobotDesktop
                         return 1;
                     }
 
-                    // 3. Kiểm thử Trình biên dịch 4 Thanh Đẩy {R, L, F, B} & Giao thức Mạch Arduino Nano (.ino.hex)
+                    // 3. Kiểm thử Trình biên dịch 2 Trục Kẹp Luân Phiên (A1: Kẹp U-D xoay R,L,F,B | A2: Kẹp R-L xoay U,D,F,B)
                     CompiledRLBFResult compiled = RLBFCompiler4Pusher.CompileTo4Pusher(solutionMoves, parsedState);
                     if (compiled == null || !compiled.VerifiedSolved || compiled.Steps == null || compiled.Steps.Count == 0)
                     {
-                        Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] RLBFCompiler4Pusher verification failed.", iter));
+                        Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] 2-Axis Clamp compiler verification failed.", iter));
                         return 1;
                     }
 
-                    int expectedTimeMs = 0;
+                    // Mô phỏng trực tiếp chuỗi SerialPayload (KHÔNG LẬT KHỐI) + kiểm tra quy tắc khóa trục cơ khí
+                    string replayState = parsedState;
+                    string activeAxis = "A1";
+                    int axisSwitches = 0;
+                    string[] rawTokens = compiled.SerialPayload.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int t = 0; t < rawTokens.Length; t++)
+                    {
+                        string tk = rawTokens[t];
+                        if (tk == "A1" || tk == "A2")
+                        {
+                            activeAxis = tk;
+                            axisSwitches++;
+                            continue;
+                        }
+                        char f = tk[0];
+                        if ((f == 'R' || f == 'L') && activeAxis != "A1")
+                        {
+                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Mechanical clash: {1} executed under {2}!", iter, tk, activeAxis));
+                            return 1;
+                        }
+                        if ((f == 'U' || f == 'D') && activeAxis != "A2")
+                        {
+                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Mechanical clash: {1} executed under {2}!", iter, tk, activeAxis));
+                            return 1;
+                        }
+                        int pushes = tk.Length > 1 ? (tk[1] - '0') : 1;
+                        for (int p = 0; p < pushes; p++)
+                        {
+                            replayState = RubikSolver3x3.ApplyMove(replayState, f.ToString());
+                        }
+                    }
+
+                    if (!RubikSolver3x3.IsSolved(replayState, false))
+                    {
+                        Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] SerialPayload direct replay did NOT reach exact SOLVED_STATE!", iter));
+                        return 1;
+                    }
+
                     int expectedPushes = 0;
+                    int prevEndMs = 0;
                     for (int s = 0; s < compiled.Steps.Count; s++)
                     {
                         PusherStep step = compiled.Steps[s];
-                        if (step.Face != 'R' && step.Face != 'L' && step.Face != 'F' && step.Face != 'B')
-                        {
-                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Non-RLFB face leaked: {1}", iter, step.Face));
-                            return 1;
-                        }
                         string expectedPin = RobotHardware.GetPinForFace(step.Face);
-                        if (!string.Equals(step.PinName, expectedPin, StringComparison.Ordinal))
+                        if (string.IsNullOrEmpty(expectedPin) || !string.Equals(step.PinName, expectedPin, StringComparison.Ordinal))
                         {
                             Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Pin mismatch for {1}: got {2}, expected {3}", iter, step.Face, step.PinName, expectedPin));
                             return 1;
@@ -157,16 +190,16 @@ namespace RubikRobotDesktop
                             Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Invalid push count or duration on step #{1}", iter, s + 1));
                             return 1;
                         }
-                        if (step.StartMs != expectedTimeMs || step.EndMs != expectedTimeMs + step.DurationMs)
+                        if (step.StartMs < prevEndMs || step.EndMs != step.StartMs + step.DurationMs)
                         {
                             Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Timeline discontinuity at step #{1}", iter, s + 1));
                             return 1;
                         }
-                        expectedTimeMs = step.EndMs;
+                        prevEndMs = step.EndMs;
                         expectedPushes += step.PushCount;
                     }
 
-                    if (compiled.TotalDurationMs != expectedTimeMs || compiled.TotalPushes != expectedPushes)
+                    if (compiled.TotalDurationMs != prevEndMs || compiled.TotalPushes != expectedPushes)
                     {
                         Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Total duration/pushes mismatch.", iter));
                         return 1;
