@@ -93,7 +93,7 @@ namespace RubikRobotDesktop
 
         private void InitializeLayout()
         {
-            Text = "🤖 RUBIK 3x3 ROBOT CONTROLLER — 4 THANH ĐẨY (R-L-F-B) & USB ARDUINO NANO";
+            Text = "🤖 RUBIK 3x3 ROBOT CONTROLLER — 2 TRỤC KẸP LUÂN PHIÊN (A1/A2 + LOCK) & USB ARDUINO NANO";
             Size = new Size(1380, 840);
             MinimumSize = new Size(1240, 760);
             StartPosition = FormStartPosition.CenterScreen;
@@ -115,7 +115,7 @@ namespace RubikRobotDesktop
             headerPanel.Controls.Add(headerBorder);
 
             Label lblTitle = new Label();
-            lblTitle.Text = "🤖 RUBIK 3x3 ROBOT CONTROLLER — 4 THANH ĐẨY (R-L-F-B) & USB ARDUINO NANO";
+            lblTitle.Text = "🤖 RUBIK 3x3 ROBOT CONTROLLER — 2 TRỤC KẸP LUÂN PHIÊN (A1/A2 + LOCK) & USB ARDUINO NANO";
             lblTitle.Font = new Font("Segoe UI", 12.5F, FontStyle.Bold);
             lblTitle.ForeColor = AccentCyan;
             lblTitle.AutoSize = true;
@@ -123,8 +123,8 @@ namespace RubikRobotDesktop
             headerPanel.Controls.Add(lblTitle);
 
             Label lblPinMap = new Label();
-            lblPinMap.Text = "[D5 = Servo R]  [D6 = Servo L]  [D9 = Servo F]  [D10 = Servo B]  [D2 = Nút START]  [D3 = Nút STOP]  [USB Serial: 9600 bps | Góc đẩy: 75° (150ms)]";
-            lblPinMap.Font = new Font("Consolas", 9F, FontStyle.Bold);
+            lblPinMap.Text = "[D5=R D6=L D9=F D10=B D11=U D12=D]  [D7=Trục A1(U-D) | D8=Trục A2(R-L)]  [D2=START | D3=STOP | USB 9600]";
+            lblPinMap.Font = new Font("Consolas", 8.5F, FontStyle.Bold);
             lblPinMap.ForeColor = AccentAmber;
             lblPinMap.AutoSize = true;
             lblPinMap.Location = new Point(14, 39);
@@ -336,7 +336,7 @@ namespace RubikRobotDesktop
 
         private Panel BuildCenterColumn()
         {
-            Panel card = CreateCardPanel("2. BỘ GIẢI 3x3 & BIÊN DỊCH TÍN HIỆU 4 THANH ĐẨY (R, L, F, B)");
+            Panel card = CreateCardPanel("2. BỘ GIẢI 3x3 & BIÊN DỊCH 2 TRỤC KẸP (A1/A2 + LOCK)");
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
@@ -360,7 +360,7 @@ namespace RubikRobotDesktop
             topBtns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
 
             _btnScramble3x3 = CreateStyledButton("🎲 Trộn Rubik 3x3 Ngẫu Nhiên", Color.FromArgb(67, 56, 202), Color.FromArgb(129, 140, 248), TextPrimary);
-            _btnSolveCompile = CreateStyledButton("⚡ GIẢI & XUẤT TÍN HIỆU (R, L, F, B)", Color.FromArgb(21, 128, 61), AccentGreen, Color.White);
+            _btnSolveCompile = CreateStyledButton("⚡ GIẢI & XUẤT TÍN HIỆU (A1/A2)", Color.FromArgb(21, 128, 61), AccentGreen, Color.White);
 
             _btnScramble3x3.Click += OnScramble3x3Click;
             _btnSolveCompile.Click += OnSolveCompileClick;
@@ -397,7 +397,7 @@ namespace RubikRobotDesktop
             Label lblSig = new Label();
             lblSig.Dock = DockStyle.Top;
             lblSig.Height = 18;
-            lblSig.Text = "Chuỗi Tín Hiệu 4 Thanh Đẩy chuẩn .ino.hex (chỉ dùng R, L, F, B - Nhịp 1, 2, 3):";
+            lblSig.Text = "Chuỗi Tín Hiệu 2 Trục Kẹp & Khóa Tay (A1/A2, LOCK, Nhịp 1-2-3):";
             lblSig.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
             lblSig.ForeColor = AccentCyan;
 
@@ -574,7 +574,7 @@ namespace RubikRobotDesktop
             _btnSendSolution.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             _btnSendSolution.Click += OnSendSolutionClick;
 
-            _btnQuickTest = CreateStyledButton("🧪 Test Nhanh (R L2 F3 B)", Color.FromArgb(14, 116, 144), AccentCyan, TextPrimary);
+            _btnQuickTest = CreateStyledButton("🧪 Test Nhanh (A1/LOCK/A2)", Color.FromArgb(14, 116, 144), AccentCyan, TextPrimary);
             _btnQuickTest.Click += OnQuickTestClick;
 
             _btnEmergencyStop = CreateStyledButton("🛑 DỪNG KHẨN CẤP (!)", Color.FromArgb(153, 27, 27), AccentRed, Color.White);
@@ -1048,8 +1048,8 @@ namespace RubikRobotDesktop
 
         private void AppendSerialBanner()
         {
-            AppendSerialLog("=== ROBOT GIAI RUBIK 4 THANH DAY SAN SANG ===");
-            AppendSerialLog("Nhap lenh don (VD: R, R2, R3) hoac chuoi (VD: R L2 F3 B):");
+            AppendSerialLog("=== ROBOT GIAI RUBIK 2 TRUC KEP LUAN PHIEN SAN SANG ===");
+            AppendSerialLog("Nhap chuoi lenh (VD: " + RobotHardware.TEST_SEQUENCE + "):");
         }
 
         private void AppendSerialLog(string line)
@@ -1237,7 +1237,7 @@ namespace RubikRobotDesktop
 
         private void OnQuickTestClick(object sender, EventArgs e)
         {
-            SendCommandPayload("R L2 F3 B", false);
+            SendCommandPayload(RobotHardware.TEST_SEQUENCE, false);
         }
 
         private void OnEmergencyStopClick(object sender, EventArgs e)

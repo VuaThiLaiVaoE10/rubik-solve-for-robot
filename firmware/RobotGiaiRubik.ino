@@ -1,23 +1,16 @@
 /*
  * ============================================================================
- * ROBOT GIAI RUBIK 4 THANH DAY (R, L, F, B) - ARDUINO NANO (ATmega328P)
+ * ROBOT GIAI RUBIK 2 TRUC KEP LUAN PHIEN (A1/A2 + LOCK) - ARDUINO NANO
  * ----------------------------------------------------------------------------
- * Mã nguồn dịch ngược 100% từ file RobotGiaiRubik.ino.hex + nâng cấp USB Stop:
- * - Chân Servo 4 thanh đẩy:
- *     + Mặt R (Right) : Chân D5  (servos[0])
- *     + Mặt L (Left)  : Chân D6  (servos[1])
- *     + Mặt F (Front) : Chân D9  (servos[2])
- *     + Mặt B (Back)  : Chân D10 (servos[3])
- * - Chân Nút nhấn vật lý:
- *     + Nút START     : Chân D2 (INPUT_PULLUP) -> Chạy chuỗi kiểm tra "R L2 F3 B"
- *     + Nút STOP      : Chân D3 (INPUT_PULLUP) -> Dừng khẩn cấp & thu 4 thanh đẩy về 0°
- * - Giao tiếp USB / UART:
- *     + Baudrate: 9600 bps (8N1)
- *     + Cú pháp nhận: Chuỗi lệnh cách nhau bởi dấu cách hoặc dấu phẩy (kết thúc bằng '\n')
- *       Ví dụ: "R L2 F3 B" hoặc "R, L2, F', B"
- *       (Trong đó: R = đẩy 1 nhịp 90°, R2 = đẩy 2 nhịp 180°, R3 hoặc R' = đẩy 3 nhịp 270°)
- * - Cơ cấu mỗi nhịp đẩy:
- *     + Đẩy Servo lên góc 75° -> đợi 150ms -> Thu Servo về góc 0° -> đợi 150ms
+ * - Chân Servo 6 thanh đẩy:
+ *     + Mặt R (Right) : D5  | Mặt L (Left) : D6
+ *     + Mặt F (Front) : D9  | Mặt B (Back) : D10
+ *     + Mặt U (Up)    : D11 | Mặt D (Down) : D12
+ * - Chân Điều khiển 2 Trục Kẹp Luân Phiên:
+ *     + Trục A1 (D7)  : Kẹp Trắng(U)-Vàng(D) -> Khóa (U,D), mở (R,L,F,B)
+ *     + Trục A2 (D8)  : Kẹp Đỏ(R)-Cam(L)     -> Khóa (R,L), mở (U,D,F,B)
+ * - Nút nhấn: D2 = START ("A1 R L2 F3 B LOCK A2 U D2"), D3 = STOP khẩn cấp
+ * - Giao tiếp USB / UART: 9600 bps (8N1), hỗ trợ key LOCK / UNLOCK / !
  * ============================================================================
  */
 
@@ -229,12 +222,12 @@ void setup() {
 }
 
 void loop() {
-  // 1. Nút START (D2): bấm để chạy chuỗi kiểm tra "R L2 F3 B"
+  // 1. Nút START (D2): bấm để chạy chuỗi kiểm tra 2 trục + LOCK
   if (digitalRead(PIN_BTN_START) == LOW) {
     delay(50);
     if (digitalRead(PIN_BTN_START) == LOW) {
-      Serial.println("\n[NUT START] Chay chuoi kiem tra: R L2 F3 B");
-      xuLyChuoiLenh("R L2 F3 B");
+      Serial.println("\n[NUT START] Chay chuoi kiem tra: A1 R L2 F3 B LOCK A2 U D2");
+      xuLyChuoiLenh("A1 R L2 F3 B LOCK A2 U D2");
       while (digitalRead(PIN_BTN_START) == LOW) {
         delay(10);
       }
