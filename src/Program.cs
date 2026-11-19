@@ -69,6 +69,26 @@ namespace RubikRobotDesktop
                     return 1;
                 }
 
+                // Kiểm tra Key Khóa Cánh Tay khi chưa đổi trục (Arm Interlock Key)
+                string lockMsg;
+                if (!RobotHardware.IsArmLockedForAxis('U', "A1", false, out lockMsg) ||
+                    !RobotHardware.IsArmLockedForAxis('D', "A1", false, out lockMsg) ||
+                    !RobotHardware.IsArmLockedForAxis('R', "A2", false, out lockMsg) ||
+                    !RobotHardware.IsArmLockedForAxis('L', "A2", false, out lockMsg) ||
+                    !RobotHardware.IsArmLockedForAxis('F', "A1", true, out lockMsg))
+                {
+                    Console.Error.WriteLine("[FAIL] Arm Interlock Key failed to lock incompatible/transit arms!");
+                    return 1;
+                }
+                if (RobotHardware.IsArmLockedForAxis('R', "A1", false, out lockMsg) ||
+                    RobotHardware.IsArmLockedForAxis('U', "A2", false, out lockMsg) ||
+                    RobotHardware.IsArmLockedForAxis('F', "A1", false, out lockMsg) ||
+                    RobotHardware.IsArmLockedForAxis('B', "A2", false, out lockMsg))
+                {
+                    Console.Error.WriteLine("[FAIL] Arm Interlock Key falsely locked a valid arm!");
+                    return 1;
+                }
+
                 Random rng = new Random(20261119);
                 int totalMovesSolved = 0;
                 int totalPusherSteps = 0;
@@ -136,29 +156,42 @@ namespace RubikRobotDesktop
                         return 1;
                     }
 
-                    // Mô phỏng trực tiếp chuỗi SerialPayload (KHÔNG LẬT KHỐI) + kiểm tra quy tắc khóa trục cơ khí
+                    // Mô phỏng trực tiếp chuỗi SerialPayload (KHÔNG LẬT KHỐI) + kiểm tra quy tắc khóa cánh tay LOCK trước khi đổi trục
                     string replayState = parsedState;
                     string activeAxis = "A1";
+                    bool transitLocked = false;
                     int axisSwitches = 0;
                     string[] rawTokens = compiled.SerialPayload.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                     for (int t = 0; t < rawTokens.Length; t++)
                     {
                         string tk = rawTokens[t];
+                        if (tk == "LOCK")
+                        {
+                            transitLocked = true;
+                            continue;
+                        }
+                        if (tk == "UNLOCK")
+                        {
+                            transitLocked = false;
+                            continue;
+                        }
                         if (tk == "A1" || tk == "A2")
                         {
+                            if (axisSwitches > 0 && !transitLocked)
+                            {
+                                Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Axis switch {1} executed WITHOUT prior LOCK key!", iter, tk));
+                                return 1;
+                            }
                             activeAxis = tk;
+                            transitLocked = false; // Đổi trục hoàn tất -> mở khóa cánh tay theo trục mới
                             axisSwitches++;
                             continue;
                         }
                         char f = tk[0];
-                        if ((f == 'R' || f == 'L') && activeAxis != "A1")
+                        string armLockReason;
+                        if (RobotHardware.IsArmLockedForAxis(f, activeAxis, transitLocked, out armLockReason))
                         {
-                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Mechanical clash: {1} executed under {2}!", iter, tk, activeAxis));
-                            return 1;
-                        }
-                        if ((f == 'U' || f == 'D') && activeAxis != "A2")
-                        {
-                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Mechanical clash: {1} executed under {2}!", iter, tk, activeAxis));
+                            Console.Error.WriteLine(string.Format("[FAIL][Iter #{0}] Mechanical clash: {1}", iter, armLockReason));
                             return 1;
                         }
                         int pushes = tk.Length > 1 ? (tk[1] - '0') : 1;

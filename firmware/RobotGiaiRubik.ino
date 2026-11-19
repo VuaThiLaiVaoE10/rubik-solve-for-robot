@@ -36,6 +36,8 @@ const int THOI_GIAN_KEP = 100; // 100ms ổn định cơ khí khi chuyển trụ
 
 Servo servos[6];
 volatile bool dungKhanCap = false;
+int trucHienTai = 1;       // 1 = Trục A1 (Kẹp U-D, khóa tay U/D), 2 = Trục A2 (Kẹp R-L, khóa tay R/L)
+bool khoaToanBoTay = false; // Key LOCK: Khóa cứng toàn bộ cánh tay khi chưa đổi trục xong
 
 void duaVeViTriGoc() {
   for (int i = 0; i < 6; i++) {
@@ -43,8 +45,29 @@ void duaVeViTriGoc() {
   }
 }
 
+bool kiemTraKhoaCanhTay(char tenMat) {
+  if (khoaToanBoTay) {
+    Serial.print("[KHOA CANH TAY - LOCK] Dang khoa toan bo canh tay! Tu choi lenh: ");
+    Serial.println(tenMat);
+    return true;
+  }
+  if (trucHienTai == 1 && (tenMat == 'U' || tenMat == 'D')) {
+    Serial.print("[KHOA CANH TAY] Chua doi sang Truc A2 (dang kep U-D) -> KHOA canh tay ");
+    Serial.println(tenMat);
+    return true;
+  }
+  if (trucHienTai == 2 && (tenMat == 'R' || tenMat == 'L')) {
+    Serial.print("[KHOA CANH TAY] Chua doi sang Truc A1 (dang kep R-L) -> KHOA canh tay ");
+    Serial.println(tenMat);
+    return true;
+  }
+  return false;
+}
+
 void chuyenTrucKep(int truc) {
   if (kiemTraDungKhanCap()) return;
+  // Tự động bật KEY KHÓA CÁNH TAY trước khi đổi trục
+  khoaToanBoTay = true;
   duaVeViTriGoc();
   if (truc == 1) {
     // Đóng kẹp Trục 1 (Trắng U - Vàng D) TRƯỚC rồi mới nhả Trục 2 để chống rơi khối Rubik
@@ -52,14 +75,18 @@ void chuyenTrucKep(int truc) {
     delay(THOI_GIAN_KEP);
     digitalWrite(PIN_CLAMP_RL, LOW);
     delay(THOI_GIAN_KEP);
-    Serial.println("[TRUC A1] Kep Trang(U)-Vang(D) -> Mo khoa R, L, F, B");
+    trucHienTai = 1;
+    khoaToanBoTay = false;
+    Serial.println("[TRUC A1] Kep Trang(U)-Vang(D) | KHOA tay (U,D) | Mo khoa (R,L,F,B)");
   } else if (truc == 2) {
     // Đóng kẹp Trục 2 (Đỏ R - Cam L) TRƯỚC rồi mới nhả Trục 1
     digitalWrite(PIN_CLAMP_RL, HIGH);
     delay(THOI_GIAN_KEP);
     digitalWrite(PIN_CLAMP_UD, LOW);
     delay(THOI_GIAN_KEP);
-    Serial.println("[TRUC A2] Kep Do(R)-Cam(L) -> Mo khoa U, D, F, B");
+    trucHienTai = 2;
+    khoaToanBoTay = false;
+    Serial.println("[TRUC A2] Kep Do(R)-Cam(L) | KHOA tay (R,L) | Mo khoa (U,D,F,B)");
   }
 }
 
@@ -81,6 +108,7 @@ bool kiemTraDungKhanCap() {
 }
 
 void dayMat(int index, char tenMat, int soNhip) {
+  if (kiemTraKhoaCanhTay(tenMat)) return;
   for (int nhip = 1; nhip <= soNhip; nhip++) {
     if (kiemTraDungKhanCap()) return;
 
@@ -107,6 +135,17 @@ void thucThiLenhDon(String token) {
   if (token == "STOP" || token == "!") {
     dungKhanCap = true;
     kiemTraDungKhanCap();
+    return;
+  }
+  if (token == "LOCK") {
+    khoaToanBoTay = true;
+    duaVeViTriGoc();
+    Serial.println("[KEY LOCK] Da KHOA cung toan bo canh tay day!");
+    return;
+  }
+  if (token == "UNLOCK") {
+    khoaToanBoTay = false;
+    Serial.println("[KEY UNLOCK] Da MO KHOA canh tay theo truc hien tai!");
     return;
   }
   if (token == "A1") {

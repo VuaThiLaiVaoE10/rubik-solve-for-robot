@@ -39,11 +39,14 @@ namespace RubikRobotDesktop
         public const int AXIS_SWITCH_MS = 200;
 
         public const int SERIAL_BAUD_RATE = 9600;
-        public const string TEST_SEQUENCE = "A1 R L2 F3 B A2 U D2";
+        public const string TEST_SEQUENCE = "A1 R L2 F3 B LOCK A2 U D2";
         public const string EMERGENCY_STOP_CMD = "!";
+        public const string ARM_LOCK_KEY = "LOCK";
+        public const string ARM_UNLOCK_KEY = "UNLOCK";
 
         public static readonly string[] SUPPORTED_TOKENS = new string[]
         {
+            "LOCK", "UNLOCK",
             "A1", "A2",
             "R", "R2", "R3",
             "L", "L2", "L3",
@@ -52,6 +55,34 @@ namespace RubikRobotDesktop
             "U", "U2", "U3",
             "D", "D2", "D3"
         };
+
+        /// <summary>
+        /// Kiểm tra khóa cánh tay an toàn:
+        /// - Khi chưa đổi trục xong (transitLocked == true): KHÓA toàn bộ 6 cánh tay.
+        /// - Khi ở Trục A1 (Kẹp Trắng U - Vàng D): KHÓA cánh tay U và D.
+        /// - Khi ở Trục A2 (Kẹp Đỏ R - Cam L): KHÓA cánh tay R và L.
+        /// </summary>
+        public static bool IsArmLockedForAxis(char face, string activeAxis, bool transitLocked, out string reason)
+        {
+            char f = char.ToUpper(face);
+            if (transitLocked)
+            {
+                reason = string.Format("[KHOA CANH TAY - LOCK] Chua doi xong truc -> KHOA cung canh tay {0}!", f);
+                return true;
+            }
+            if (string.Equals(activeAxis, "A1", StringComparison.OrdinalIgnoreCase) && (f == 'U' || f == 'D'))
+            {
+                reason = string.Format("[KHOA CANH TAY] Chua doi sang Truc A2 (dang kep U-D) -> KHOA canh tay {0}!", f);
+                return true;
+            }
+            if (string.Equals(activeAxis, "A2", StringComparison.OrdinalIgnoreCase) && (f == 'R' || f == 'L'))
+            {
+                reason = string.Format("[KHOA CANH TAY] Chua doi sang Truc A1 (dang kep R-L) -> KHOA canh tay {0}!", f);
+                return true;
+            }
+            reason = string.Empty;
+            return false;
+        }
 
         public static string GetPinForFace(char face)
         {
@@ -1728,12 +1759,17 @@ namespace RubikRobotDesktop
 
                     if (!axisEmitted || !string.Equals(neededAxis, currentAxis, StringComparison.Ordinal))
                     {
+                        if (axisEmitted)
+                        {
+                            // Trước khi đổi trục: phát key LOCK để khóa cứng toàn bộ cánh tay đẩy
+                            result.PusherTokens.Add(RobotHardware.ARM_LOCK_KEY);
+                        }
                         currentAxis = neededAxis;
                         axisEmitted = true;
                         result.PusherTokens.Add(currentAxis);
                         axisSwitchNote = string.Equals(currentAxis, "A1", StringComparison.Ordinal)
-                            ? "A1: Kẹp Trắng U-Vàng D"
-                            : "A2: Kẹp Đỏ R-Cam L";
+                            ? "LOCK -> A1 (Khóa U,D | Mở R,L,F,B)"
+                            : "LOCK -> A2 (Khóa R,L | Mở U,D,F,B)";
                         currentMs += RobotHardware.AXIS_SWITCH_MS;
                     }
 

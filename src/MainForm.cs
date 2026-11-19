@@ -1336,6 +1336,8 @@ namespace RubikRobotDesktop
             _virtualNanoTimer.Stop();
             _virtualQueue.Clear();
 
+            string simAxis = "A1";
+            bool simLocked = false;
             string[] tokens = commandLine.Split(new char[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < tokens.Length; i++)
             {
@@ -1349,10 +1351,33 @@ namespace RubikRobotDesktop
                     _virtualQueue.Enqueue(new VirtualPulseEvent { IsStop = true });
                     break;
                 }
+                if (tok == "LOCK")
+                {
+                    simLocked = true;
+                    continue;
+                }
+                if (tok == "UNLOCK")
+                {
+                    simLocked = false;
+                    continue;
+                }
+                if (tok == "A1" || tok == "A2")
+                {
+                    simAxis = tok;
+                    simLocked = false; // Mở khóa cánh tay hợp lệ sau khi đã đổi trục xong
+                    continue;
+                }
 
                 char face = tok[0];
-                if (face != 'R' && face != 'L' && face != 'F' && face != 'B')
+                if (face != 'R' && face != 'L' && face != 'F' && face != 'B' && face != 'U' && face != 'D')
                 {
+                    continue;
+                }
+
+                string lockReason;
+                if (RobotHardware.IsArmLockedForAxis(face, simAxis, simLocked, out lockReason))
+                {
+                    AppendSerialLog("[RX] " + lockReason);
                     continue;
                 }
 
